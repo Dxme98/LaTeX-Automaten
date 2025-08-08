@@ -222,6 +222,16 @@ export const useAutomaton = () => {
     );
   };
 
+  /**
+   *
+   * Leert die Knoten- und Kantenlisten und setzt den Zähler für die Knoten-IDs zurück.
+   */
+  const clearAutomaton = () => {
+    setNodes([]);
+    setEdges([]);
+    setNextNodeId(0);
+  };
+
   // Rückgabe des Hooks: Der Zustand und die Funktionen zur Manipulation.
   return {
     nodes,
@@ -234,5 +244,6 @@ export const useAutomaton = () => {
     updateEdgeStyle,
     updateEdgeLabel,
     updateNodeLabel,
+    clearAutomaton,
   };
 };

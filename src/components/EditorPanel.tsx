@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Edge, EdgeStyle, Node } from "../types";
 
 interface EditorPanelProps {
@@ -42,16 +42,34 @@ const EditorPanel: React.FC<EditorPanelProps> = ({
   nodes,
   tikzCode,
 }) => {
+  const [isCopied, setIsCopied] = useState(false);
+
   // Finde die zu bearbeitende Kante
   const edgeToEdit = edges.find((e) => e.id === editingEdgeStyle);
 
   // Finde den zu bearbeitenden Knoten
   const nodeToEdit = nodes.find((n) => n.id === editingNodeLabel);
 
+  // --- Funktion zum Kopieren des TikZ-Codes ---
+  const handleCopy = () => {
+    if (isCopied) return; // Verhindert mehrfaches Klicken
+
+    navigator.clipboard.writeText(tikzCode).then(
+      () => {
+        setIsCopied(true);
+        // Setzt den Button-Zustand nach 2 Sekunden zurück
+        setTimeout(() => setIsCopied(false), 2000);
+      },
+      (err) => {
+        console.error("Could not copy text: ", err);
+      }
+    );
+  };
+
   return (
-    <div className="w-80 bg-white border border-gray-300 rounded-lg p-4">
+    <div className="w-80 bg-white border border-gray-300 rounded-lg p-4 flex flex-col">
       <h3 className="text-lg font-semibold mb-4">TikZ Export</h3>
-      <div className="space-y-4">
+      <div className="space-y-4 flex-1 flex flex-col">
         {isAddingEdge && (
           <div className="p-3 bg-blue-50 border border-blue-200 rounded">
             <p className="text-sm text-blue-700">
@@ -120,7 +138,6 @@ const EditorPanel: React.FC<EditorPanelProps> = ({
                         Bend Amount:
                       </label>
                       <div className="flex items-center space-x-3">
-                        {/* NEU: Schieberegler (Slider) */}
                         <input
                           id="bendAmountSlider"
                           type="range"
@@ -128,7 +145,6 @@ const EditorPanel: React.FC<EditorPanelProps> = ({
                           max="100"
                           value={edgeToEdit.style.bendAmount || 30}
                           onChange={(e) => {
-                            // Wert aus dem Slider auslesen und als Zahl speichern
                             const value = parseInt(e.target.value, 10);
                             updateEdgeStyle(edgeToEdit.id, {
                               bendAmount: value,
@@ -232,12 +248,28 @@ const EditorPanel: React.FC<EditorPanelProps> = ({
           </div>
         )}
 
-        <textarea
-          value={tikzCode}
-          readOnly
-          className="w-full h-96 p-3 border border-gray-300 rounded text-sm font-mono"
-          placeholder="TikZ code will appear here..."
-        />
+        {/* --- Container für Textarea und Copy-Button --- */}
+        <div className="flex-1 flex flex-col mt-auto">
+          <textarea
+            value={tikzCode}
+            readOnly
+            className="w-full flex-1 p-3 border border-gray-300 rounded-t text-sm font-mono"
+            placeholder="TikZ code will appear here..."
+          />
+          <button
+            onClick={handleCopy}
+            disabled={!tikzCode || isCopied}
+            className={`w-full py-2 text-white font-semibold rounded-b transition-colors
+              ${isCopied ? "bg-green-500" : "bg-blue-500"}
+              ${
+                !tikzCode || isCopied
+                  ? "opacity-70 cursor-not-allowed"
+                  : "hover:bg-blue-600"
+              }`}
+          >
+            {isCopied ? "Copied!" : "Copy TikZ Code"}
+          </button>
+        </div>
       </div>
     </div>
   );

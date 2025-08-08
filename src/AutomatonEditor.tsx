@@ -1,4 +1,3 @@
-// src/AutomatonEditor.tsx
 import "./App.css";
 import React, { useState, useRef } from "react";
 import { useAutomaton } from "./hooks/useAutomaton";
@@ -27,7 +26,10 @@ export default function AutomatonEditor() {
     updateEdgeStyle,
     updateEdgeLabel,
     updateNodeLabel,
+    clearAutomaton,
   } = useAutomaton();
+
+  const [showGrid, setShowGrid] = useState(true);
 
   // UI-Zustand, der nur für die Darstellung relevant ist
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
@@ -165,91 +167,123 @@ export default function AutomatonEditor() {
     setNodeLabelInput("");
   };
 
+  const handleClearCanvas = () => {
+    clearAutomaton();
+  };
+
   // Generiert den TikZ-Code bei jedem Render-Vorgang neu
   const tikzCode = generateTikzCode(nodes, edges);
 
   return (
     <div className="w-full h-screen bg-gray-100 p-4">
       <div className="flex gap-4 h-full">
-        {/* Dieser Container ist der Positionierungsanker für das Kontextmenü (`relative`) */}
-        <div
-          ref={canvasContainerRef}
-          className="flex-1 bg-white border border-gray-300 rounded-lg overflow-auto relative"
-          onClick={() => {
-            setShowContextMenu(false);
-            setSelectedNode(null);
-          }}
-        >
-          {/* Bedingtes Rendering: Zeige "Add First Node"-Button, wenn keine Knoten da sind. */}
-          {nodes.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
-              <button
-                onClick={addFirstNode}
-                className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+        <div className="flex-1 flex flex-col gap-2">
+          {/* --- Toolbar für QoL-Features --- */}
+          <div className="bg-white border border-gray-300 rounded-lg p-2 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <label
+                htmlFor="showGrid"
+                className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"
               >
-                Add First Node
-              </button>
-            </div>
-          ) : (
-            <>
-              <svg
-                width={svgWidth}
-                height={svgHeight}
-                className="cursor-crosshair"
-              >
-                {/* Definitionen für wiederverwendbare SVG-Elemente. */}
-                <defs>
-                  {/* Definiert eine Pfeilspitze, die von Kanten über ihre ID arrowhead verwendet werden kann. */}
-                  <marker
-                    id="arrowhead"
-                    markerWidth="10"
-                    markerHeight="7"
-                    refX="9"
-                    refY="3.5"
-                    orient="auto"
-                    fill="black"
-                  >
-                    <polygon points="0 0, 10 3.5, 0 7" />
-                  </marker>
-                </defs>
-                {/* Rendern der einzelnen Komponenten. */}
-                <Grid nodes={nodes} />
-                {/* Wir mappen über die `edges`- und `nodes`-Arrays aus dem State... */}
-                {edges.map((edge) => (
-                  <EdgeComponent
-                    key={edge.id}
-                    edge={edge}
-                    nodes={nodes}
-                    handleEdgeLabelEdit={handleEdgeLabelEdit}
-                    handleEdgeStyleEdit={handleEdgeStyleEdit}
-                  />
-                ))}
-                {nodes.map((node) => (
-                  <NodeComponent
-                    key={node.id}
-                    node={node}
-                    pos={gridToPixel({ x: node.gridX, y: node.gridY }, nodes)}
-                    selectedNode={selectedNode}
-                    handleNodeClick={handleNodeClick}
-                  />
-                ))}
-              </svg>
-
-              {/* ContextMenu wird HIER gerendert, außerhalb des SVGs aber innerhalb des relativen Containers */}
-              {showContextMenu && selectedNode && (
-                <ContextMenu
-                  pos={contextMenuPos}
-                  nodes={nodes}
-                  selectedNode={selectedNode}
-                  addNode={handleAddNode}
-                  toggleStart={handleToggleStart}
-                  toggleAccepting={handleToggleAccepting}
-                  startAddingEdge={startAddingEdge}
-                  startEditingNodeLabel={startEditingNodeLabel}
+                <input
+                  type="checkbox"
+                  id="showGrid"
+                  checked={showGrid}
+                  onChange={() => setShowGrid(!showGrid)}
+                  className="rounded"
                 />
-              )}
-            </>
-          )}
+                Show Grid
+              </label>
+            </div>
+            <button
+              onClick={handleClearCanvas}
+              title="Clear Canvas"
+              className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center gap-2 text-sm"
+            >
+              Clear Canvas
+            </button>
+          </div>
+
+          {/* Dieser Container ist der Positionierungsanker für das Kontextmenü (`relative`) */}
+          <div
+            ref={canvasContainerRef}
+            className="flex-1 bg-white border border-gray-300 rounded-lg overflow-auto relative"
+            onClick={() => {
+              setShowContextMenu(false);
+              setSelectedNode(null);
+            }}
+          >
+            {/* Bedingtes Rendering: Zeige "Add First Node"-Button, wenn keine Knoten da sind. */}
+            {nodes.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <button
+                  onClick={addFirstNode}
+                  className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                >
+                  Add First Node
+                </button>
+              </div>
+            ) : (
+              <>
+                <svg
+                  width={svgWidth}
+                  height={svgHeight}
+                  className="cursor-crosshair"
+                >
+                  {/* Definitionen für wiederverwendbare SVG-Elemente. */}
+                  <defs>
+                    {/* Definiert eine Pfeilspitze, die von Kanten über ihre ID arrowhead verwendet werden kann. */}
+                    <marker
+                      id="arrowhead"
+                      markerWidth="10"
+                      markerHeight="7"
+                      refX="9"
+                      refY="3.5"
+                      orient="auto"
+                      fill="black"
+                    >
+                      <polygon points="0 0, 10 3.5, 0 7" />
+                    </marker>
+                  </defs>
+                  {/* --- NEU: Grid wird nur bei Bedarf gerendert --- */}
+                  {showGrid && <Grid nodes={nodes} />}
+                  {/* Wir mappen über die `edges`- und `nodes`-Arrays aus dem State... */}
+                  {edges.map((edge) => (
+                    <EdgeComponent
+                      key={edge.id}
+                      edge={edge}
+                      nodes={nodes}
+                      handleEdgeLabelEdit={handleEdgeLabelEdit}
+                      handleEdgeStyleEdit={handleEdgeStyleEdit}
+                    />
+                  ))}
+                  {nodes.map((node) => (
+                    <NodeComponent
+                      key={node.id}
+                      node={node}
+                      pos={gridToPixel({ x: node.gridX, y: node.gridY }, nodes)}
+                      selectedNode={selectedNode}
+                      handleNodeClick={handleNodeClick}
+                    />
+                  ))}
+                </svg>
+
+                {/* ContextMenu wird HIER gerendert, außerhalb des SVGs aber innerhalb des relativen Containers */}
+                {showContextMenu && selectedNode && (
+                  <ContextMenu
+                    pos={contextMenuPos}
+                    nodes={nodes}
+                    selectedNode={selectedNode}
+                    addNode={handleAddNode}
+                    toggleStart={handleToggleStart}
+                    toggleAccepting={handleToggleAccepting}
+                    startAddingEdge={startAddingEdge}
+                    startEditingNodeLabel={startEditingNodeLabel}
+                  />
+                )}
+              </>
+            )}
+          </div>
         </div>
         {/* Das Panel auf der rechten Seite. */}
         <EditorPanel
