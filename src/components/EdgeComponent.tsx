@@ -73,7 +73,7 @@ const EdgeComponent: React.FC<EdgeComponentProps> = ({
           endY - spacing - loopRadius * 0.8
         }, ${endX} ${endY}`;
         labelX = fromPos.x;
-        labelY = fromPos.y - NODE_RADIUS - spacing - loopRadius * 0.6;
+        labelY = fromPos.y - NODE_RADIUS - spacing - loopRadius * 0.7;
         break;
       case "below":
         const startXB = fromPos.x - 8;
@@ -131,6 +131,7 @@ const EdgeComponent: React.FC<EdgeComponentProps> = ({
           x={labelX}
           y={labelY}
           textAnchor="middle"
+          dominantBaseline="central"
           fontSize="14"
           onClick={() => handleEdgeLabelEdit(edge.id)}
           style={{ cursor: "pointer" }}
@@ -157,43 +158,56 @@ const EdgeComponent: React.FC<EdgeComponentProps> = ({
     };
   } else {
     // Rendering von gebogenen Kanten
-    // Verwendung einer Bezier-Kurve, diese benötigt: einen Startpunkt, einen Kontrollpunkt und einen Endpunkt
     const midX = (edgeStartPos.x + edgeEndPos.x) / 2;
     const midY = (edgeStartPos.y + edgeEndPos.y) / 2;
     const dx = edgeEndPos.x - edgeStartPos.x;
     const dy = edgeEndPos.y - edgeStartPos.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
-    const bendOffset = distance * 0.3;
+
+    const bendAmount = edge.style.bendAmount || 30;
+    const bendOffset = (distance * bendAmount) / 100;
     let controlX, controlY;
 
-    // Der Kontrollpunkt wird senkrecht zur Linie zwischen Start- und Endpunkt verschoben
-    // Dies erzeugt die Biegung nach "links" oder "rechts"
     if (edge.style.bend === "left") {
-      controlX = midX - (dy / distance) * bendOffset;
-      controlY = midY + (dx / distance) * bendOffset;
-    } else {
       controlX = midX + (dy / distance) * bendOffset;
       controlY = midY - (dx / distance) * bendOffset;
+    } else {
+      controlX = midX - (dy / distance) * bendOffset;
+      controlY = midY + (dx / distance) * bendOffset;
     }
     pathData = `M ${edgeStartPos.x} ${edgeStartPos.y} Q ${controlX} ${controlY} ${edgeEndPos.x} ${edgeEndPos.y}`;
-    labelPos = { x: controlX, y: controlY };
+
+    // Das Label wird am Scheitelpunkt der Bézier-Kurve platziert (bei t=0.5)
+    labelPos = {
+      x: 0.25 * edgeStartPos.x + 0.5 * controlX + 0.25 * edgeEndPos.x,
+      y: 0.25 * edgeStartPos.y + 0.5 * controlY + 0.25 * edgeEndPos.y,
+    };
   }
 
-  // Verschiebe das Label leicht, je nach Einstellung
   const labelOffset = 15;
-  switch (edge.style.labelPosition) {
-    case "above":
-      labelPos.y -= labelOffset;
-      break;
-    case "below":
-      labelPos.y += labelOffset;
-      break;
-    case "left":
-      labelPos.x -= labelOffset;
-      break;
-    case "right":
-      labelPos.x += labelOffset;
-      break;
+  if (edge.style.labelPosition) {
+    const dx = edgeEndPos.x - edgeStartPos.x;
+    const dy = edgeEndPos.y - edgeStartPos.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance > 0) {
+      // Normalisierter Vektor senkrecht zur Kante
+      const nx = -dy / distance;
+      const ny = dx / distance;
+
+      switch (edge.style.labelPosition) {
+        case "above":
+          //  case "left":
+          labelPos.x -= nx * labelOffset;
+          labelPos.y -= ny * labelOffset;
+          break;
+        case "below":
+          //   case "right":
+          labelPos.x += nx * labelOffset;
+          labelPos.y += ny * labelOffset;
+          break;
+      }
+    }
   }
 
   return (
@@ -211,6 +225,7 @@ const EdgeComponent: React.FC<EdgeComponentProps> = ({
         x={labelPos.x}
         y={labelPos.y}
         textAnchor="middle"
+        dominantBaseline="central"
         fontSize="14"
         onClick={() => handleEdgeLabelEdit(edge.id)}
         style={{ cursor: "pointer" }}

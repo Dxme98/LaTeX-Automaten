@@ -9,6 +9,7 @@ interface ContextMenuProps {
   toggleStart: () => void;
   toggleAccepting: () => void;
   startAddingEdge: () => void;
+  startEditingNodeLabel: () => void;
 }
 
 const ContextMenu: React.FC<ContextMenuProps> = ({
@@ -19,6 +20,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
   toggleStart,
   toggleAccepting,
   startAddingEdge,
+  startEditingNodeLabel,
 }) => {
   // Finde die Daten des aktuell ausgewählten Knotens
   const selectedNodeData = nodes.find((n) => n.id === selectedNode);
@@ -72,6 +74,12 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
             className="w-full px-3 py-1 text-left hover:bg-gray-100 rounded"
           >
             {selectedNodeData?.isAccepting ? "Remove" : "Set"} Accepting State
+          </button>
+          <button
+            onClick={startEditingNodeLabel}
+            className="w-full px-3 py-1 text-left hover:bg-gray-100 rounded"
+          >
+            Change Label Name
           </button>
           <hr />
           <button

@@ -17,6 +17,7 @@ export interface Edge {
 
 export interface EdgeStyle {
   bend: "none" | "left" | "right";
+  bendAmount: number;
   labelPosition: "above" | "below" | "left" | "right";
   isLoop: boolean;
   loopPosition?: "above" | "below" | "left" | "right";

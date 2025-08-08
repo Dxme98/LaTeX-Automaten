@@ -37,23 +37,24 @@ const getRelativePosition = (node: Node, allNodes: Node[]) => {
   let position = "";
 
   if (deltaX > 0 && deltaY === 0) {
-    position = `right=of ${closestNode.id}`;
+    position = `right=of ${closestNode.label}`;
   } else if (deltaX < 0 && deltaY === 0) {
-    position = `left=of ${closestNode.id}`;
+    position = `left=of ${closestNode.label}`;
   } else if (deltaY > 0 && deltaX === 0) {
-    position = `below=of ${closestNode.id}`;
+    position = `below=of ${closestNode.label}`;
   } else if (deltaY < 0 && deltaX === 0) {
-    position = `above=of ${closestNode.id}`;
+    position = `above=of ${closestNode.label}`;
   } else {
-    if (deltaX > 0) position += `right=of ${referenceNode.id}`;
-    else if (deltaX < 0) position += `left=of ${referenceNode.id}`;
+    // Für diagonale Positionierung verwenden wir auch das Label des Referenzknotens
+    if (deltaX > 0) position += `right=of ${referenceNode.label}`;
+    else if (deltaX < 0) position += `left=of ${referenceNode.label}`;
 
     if (deltaY > 0) {
       if (position) position += ", ";
-      position += `below=of ${referenceNode.id}`;
+      position += `below=of ${referenceNode.label}`;
     } else if (deltaY < 0) {
       if (position) position += ", ";
-      position += `above=of ${referenceNode.id}`;
+      position += `above=of ${referenceNode.label}`;
     }
   }
 
@@ -73,7 +74,8 @@ export const generateTikzCode = (nodes: Node[], edges: Edge[]) => {
     const optionsStr =
       nodeOptions.length > 0 ? `[state,${nodeOptions.join(",")}]` : "[state]";
 
-    tikzCode += `  \\node${optionsStr} (${node.id})${relativePos} {$${node.label}$};\n`;
+    // Verwende das Label als TikZ-Knoten-ID und als Anzeige-Text
+    tikzCode += `  \\node${optionsStr} (${node.label})${relativePos} {$${node.label}$};\n`;
   });
 
   tikzCode += `\n`;
@@ -96,7 +98,15 @@ export const generateTikzCode = (nodes: Node[], edges: Edge[]) => {
         edgeOptions.push(`loop ${edge.style.loopPosition}`);
       } else {
         if (edge.style.bend !== "none") {
-          edgeOptions.push(`bend ${edge.style.bend}`);
+          // Hole bendAmount (Standard: 30)
+          const bendAmount = edge.style.bendAmount || 30;
+
+          // Nur bendAmount hinzufügen, wenn es nicht der Standardwert (30) ist
+          if (bendAmount !== 30) {
+            edgeOptions.push(`bend ${edge.style.bend}=${bendAmount}`);
+          } else {
+            edgeOptions.push(`bend ${edge.style.bend}`);
+          }
         }
         if (edge.style.labelPosition !== "above") {
           edgeOptions.push(edge.style.labelPosition);
@@ -107,8 +117,16 @@ export const generateTikzCode = (nodes: Node[], edges: Edge[]) => {
         edgeOptions.length > 0 ? `[${edgeOptions.join(", ")}]` : "";
       const nodeStr = ` node{${edge.label}}`;
 
+      // Finde die entsprechenden Knoten-Labels basierend auf den IDs
+      const fromNode = nodes.find((n) => n.id === edge.fromNodeId);
+      const toNode = nodes.find((n) => n.id === edge.toNodeId);
+
+      // Verwende die Labels anstatt der IDs für die TikZ-Referenzen
+      const fromLabel = fromNode?.label || edge.fromNodeId;
+      const toLabel = toNode?.label || edge.toNodeId;
+
       edgeLines.push(
-        `    (${edge.fromNodeId}) edge${optionsStr}${nodeStr} (${edge.toNodeId})`
+        `    (${fromLabel}) edge${optionsStr}${nodeStr} (${toLabel})`
       );
     });
   });

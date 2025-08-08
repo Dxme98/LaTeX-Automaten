@@ -175,6 +175,7 @@ export const useAutomaton = () => {
       toNodeId,
       label: "a", // Standard-Label
       style: {
+        bendAmount: 30,
         bend: "none",
         labelPosition: "above",
         isLoop,
@@ -210,6 +211,17 @@ export const useAutomaton = () => {
     );
   };
 
+  /**
+   * Aktualisiert das Text-Label eines Knotens.
+   * @param nodeId Die ID des zu aktualisierenden Knotens.
+   * @param label Das neue Label.
+   */
+  const updateNodeLabel = (nodeId: string, label: string) => {
+    setNodes((prev) =>
+      prev.map((node) => (node.id === nodeId ? { ...node, label } : node))
+    );
+  };
+
   // Rückgabe des Hooks: Der Zustand und die Funktionen zur Manipulation.
   return {
     nodes,
@@ -221,5 +233,6 @@ export const useAutomaton = () => {
     addEdge,
     updateEdgeStyle,
     updateEdgeLabel,
+    updateNodeLabel,
   };
 };

@@ -26,6 +26,7 @@ export default function AutomatonEditor() {
     addEdge,
     updateEdgeStyle,
     updateEdgeLabel,
+    updateNodeLabel,
   } = useAutomaton();
 
   // UI-Zustand, der nur für die Darstellung relevant ist
@@ -37,6 +38,8 @@ export default function AutomatonEditor() {
   const [edgeStart, setEdgeStart] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState<string | null>(null);
   const [labelInput, setLabelInput] = useState("");
+  const [editingNodeLabel, setEditingNodeLabel] = useState<string | null>(null);
+  const [nodeLabelInput, setNodeLabelInput] = useState("");
 
   // Ref um das ContextMenu korrekt platzieren
   const canvasContainerRef = useRef<HTMLDivElement>(null);
@@ -131,6 +134,37 @@ export default function AutomatonEditor() {
     setEditingEdgeStyle(edgeId);
   };
 
+  /**
+   * Startet die Bearbeitung eines Knoten-Labels
+   */
+  const startEditingNodeLabel = () => {
+    if (selectedNode) {
+      setEditingNodeLabel(selectedNode);
+      const node = nodes.find((n) => n.id === selectedNode);
+      setNodeLabelInput(node?.label || "");
+      setShowContextMenu(false);
+    }
+  };
+
+  /**
+   * Speichert das bearbeitete Knoten-Label
+   */
+  const saveNodeLabelEdit = () => {
+    if (editingNodeLabel) {
+      updateNodeLabel(editingNodeLabel, nodeLabelInput);
+      setEditingNodeLabel(null);
+      setNodeLabelInput("");
+    }
+  };
+
+  /**
+   * Bricht die Bearbeitung des Knoten-Labels ab
+   */
+  const cancelNodeLabelEdit = () => {
+    setEditingNodeLabel(null);
+    setNodeLabelInput("");
+  };
+
   // Generiert den TikZ-Code bei jedem Render-Vorgang neu
   const tikzCode = generateTikzCode(nodes, edges);
 
@@ -211,6 +245,7 @@ export default function AutomatonEditor() {
                   toggleStart={handleToggleStart}
                   toggleAccepting={handleToggleAccepting}
                   startAddingEdge={startAddingEdge}
+                  startEditingNodeLabel={startEditingNodeLabel}
                 />
               )}
             </>
@@ -232,6 +267,12 @@ export default function AutomatonEditor() {
           setLabelInput={setLabelInput}
           saveLabelEdit={saveLabelEdit}
           cancelLabelEdit={cancelLabelEdit}
+          editingNodeLabel={editingNodeLabel}
+          nodeLabelInput={nodeLabelInput}
+          setNodeLabelInput={setNodeLabelInput}
+          saveNodeLabelEdit={saveNodeLabelEdit}
+          cancelNodeLabelEdit={cancelNodeLabelEdit}
+          nodes={nodes}
           tikzCode={tikzCode}
         />
       </div>
