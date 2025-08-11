@@ -27,6 +27,8 @@ export default function AutomatonEditor() {
     updateEdgeLabel,
     updateNodeLabel,
     clearAutomaton,
+    undoLastAction,
+    canUndo,
   } = useAutomaton();
 
   const [showGrid, setShowGrid] = useState(true);
@@ -171,6 +173,21 @@ export default function AutomatonEditor() {
     clearAutomaton();
   };
 
+  /**
+   * Behandelt den Back-Button Klick
+   */
+  const handleBackClick = () => {
+    undoLastAction();
+    // Schließe alle offenen Dialoge beim Zurückgehen
+    setShowContextMenu(false);
+    setSelectedNode(null);
+    setEditingEdgeStyle(null);
+    setEditingLabel(null);
+    setEditingNodeLabel(null);
+    setIsAddingEdge(false);
+    setEdgeStart(null);
+  };
+
   // Generiert den TikZ-Code bei jedem Render-Vorgang neu
   const tikzCode = generateTikzCode(nodes, edges);
 
@@ -194,6 +211,18 @@ export default function AutomatonEditor() {
                 />
                 Show Grid
               </label>
+              <button
+                onClick={handleBackClick}
+                disabled={!canUndo}
+                title="Undo last action (Back)"
+                className={`px-3 py-2 text-white rounded-lg flex items-center gap-2 text-sm transition-colors ${
+                  canUndo
+                    ? "bg-orange-500 hover:bg-orange-600 cursor-pointer"
+                    : "bg-gray-400 cursor-not-allowed"
+                }`}
+              >
+                Undo
+              </button>
             </div>
             <button
               onClick={handleClearCanvas}

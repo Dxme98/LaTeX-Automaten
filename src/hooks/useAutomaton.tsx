@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { Node, Edge, EdgeStyle } from "../types";
 
+// Typ für Aktionen, die rückgängig gemacht werden können
+type UndoAction =
+  | { type: "addNode"; nodeId: string }
+  | { type: "addEdge"; edgeId: string };
+
 // Der Hook gibt ein Objekt zurück, das den aktuellen Zustand und Funktionen zur Manipulation enthält
 export const useAutomaton = () => {
   // State für die Liste aller Knoten im Automaten
@@ -9,6 +14,8 @@ export const useAutomaton = () => {
   const [edges, setEdges] = useState<Edge[]>([]);
   // State, um die ID des nächsten zu erstellenden Knotens zu verfolgen (z.B. q0, q1, q2...)
   const [nextNodeId, setNextNodeId] = useState(0);
+  // State für Undo-History
+  const [undoHistory, setUndoHistory] = useState<UndoAction[]>([]);
 
   /**
    * Verschiebt alle Knoten ab einer bestimmten Koordinate in eine Richtung, um Platz zu schaffen.
@@ -67,6 +74,11 @@ export const useAutomaton = () => {
       };
       setNodes([newNode]);
       setNextNodeId(nextNodeId + 1);
+      // Füge zur Undo-History hinzu
+      setUndoHistory((prev) => [
+        ...prev,
+        { type: "addNode", nodeId: newNode.id },
+      ]);
     }
   };
 
@@ -131,6 +143,11 @@ export const useAutomaton = () => {
     // Füge den neuen Knoten zum State hinzu.
     setNodes((prev) => [...prev, newNode]);
     setNextNodeId(nextNodeId + 1);
+    // Füge zur Undo-History hinzu
+    setUndoHistory((prev) => [
+      ...prev,
+      { type: "addNode", nodeId: newNode.id },
+    ]);
   };
 
   /**
@@ -183,6 +200,11 @@ export const useAutomaton = () => {
       },
     };
     setEdges((prev) => [...prev, newEdge]);
+    // Füge zur Undo-History hinzu
+    setUndoHistory((prev) => [
+      ...prev,
+      { type: "addEdge", edgeId: newEdge.id },
+    ]);
   };
 
   /**
@@ -223,13 +245,46 @@ export const useAutomaton = () => {
   };
 
   /**
-   *
+   * Macht die letzte Aktion rückgängig (Back-Funktion)
+   */
+  const undoLastAction = () => {
+    if (undoHistory.length === 0) return;
+
+    const lastAction = undoHistory[undoHistory.length - 1];
+
+    if (lastAction.type === "addNode") {
+      // Entferne den Knoten und alle damit verbundenen Kanten
+      setNodes((prev) => prev.filter((node) => node.id !== lastAction.nodeId));
+      setEdges((prev) =>
+        prev.filter(
+          (edge) =>
+            edge.fromNodeId !== lastAction.nodeId &&
+            edge.toNodeId !== lastAction.nodeId
+        )
+      );
+
+      // Wenn der entfernte Knoten der letzte war, reduziere nextNodeId
+      const nodeIdNum = parseInt(lastAction.nodeId.substring(1));
+      if (nodeIdNum === nextNodeId - 1) {
+        setNextNodeId(nodeIdNum);
+      }
+    } else if (lastAction.type === "addEdge") {
+      // Entferne die Kante
+      setEdges((prev) => prev.filter((edge) => edge.id !== lastAction.edgeId));
+    }
+
+    // Entferne die Aktion aus der History
+    setUndoHistory((prev) => prev.slice(0, -1));
+  };
+
+  /**
    * Leert die Knoten- und Kantenlisten und setzt den Zähler für die Knoten-IDs zurück.
    */
   const clearAutomaton = () => {
     setNodes([]);
     setEdges([]);
     setNextNodeId(0);
+    setUndoHistory([]);
   };
 
   // Rückgabe des Hooks: Der Zustand und die Funktionen zur Manipulation.
@@ -245,5 +300,7 @@ export const useAutomaton = () => {
     updateEdgeLabel,
     updateNodeLabel,
     clearAutomaton,
+    undoLastAction,
+    canUndo: undoHistory.length > 0,
   };
 };
