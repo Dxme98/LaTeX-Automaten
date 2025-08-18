@@ -1,6 +1,10 @@
 import { Node, Edge } from "../types";
 
-const getRelativePosition = (node: Node, allNodes: Node[]) => {
+const getRelativePosition = (
+  node: Node,
+  allNodes: Node[],
+  processedNodes: Set<string>
+) => {
   const sortedNodes = [...allNodes].sort((a, b) => {
     const aNum = parseInt(a.id.substring(1));
     const bNum = parseInt(b.id.substring(1));
@@ -15,8 +19,10 @@ const getRelativePosition = (node: Node, allNodes: Node[]) => {
   let closestNode = referenceNode;
   let minDistance = Infinity;
 
+  // Finde den besten bereits verarbeiteten Knoten als Referenz
   for (const otherNode of allNodes) {
     if (otherNode.id === node.id) continue;
+    if (!processedNodes.has(otherNode.id)) continue;
 
     const distance =
       Math.abs(node.gridX - otherNode.gridX) +
@@ -29,6 +35,14 @@ const getRelativePosition = (node: Node, allNodes: Node[]) => {
       minDistance = distance;
       closestNode = otherNode;
     }
+  }
+
+  // Fallback: Verwende den ersten Knoten, falls verfügbar
+  if (
+    !processedNodes.has(closestNode.id) &&
+    processedNodes.has(referenceNode.id)
+  ) {
+    closestNode = referenceNode;
   }
 
   const deltaX = node.gridX - closestNode.gridX;
@@ -45,27 +59,143 @@ const getRelativePosition = (node: Node, allNodes: Node[]) => {
   } else if (deltaY < 0 && deltaX === 0) {
     position = `above=of ${closestNode.label}`;
   } else {
-    // Für diagonale Positionierung verwenden wir auch das Label des Referenzknotens
-    if (deltaX > 0) position += `right=of ${referenceNode.label}`;
-    else if (deltaX < 0) position += `left=of ${referenceNode.label}`;
+    // Für diagonale Positionierung
+    let referenceForDiagonal = closestNode;
+
+    if (!processedNodes.has(closestNode.id)) {
+      for (const otherNode of allNodes) {
+        if (processedNodes.has(otherNode.id)) {
+          referenceForDiagonal = otherNode;
+          break;
+        }
+      }
+    }
+
+    if (deltaX > 0) position += `right=of ${referenceForDiagonal.label}`;
+    else if (deltaX < 0) position += `left=of ${referenceForDiagonal.label}`;
 
     if (deltaY > 0) {
       if (position) position += ", ";
-      position += `below=of ${referenceNode.label}`;
+      position += `below=of ${referenceForDiagonal.label}`;
     } else if (deltaY < 0) {
       if (position) position += ", ";
-      position += `above=of ${referenceNode.label}`;
+      position += `above=of ${referenceForDiagonal.label}`;
     }
   }
 
   return position ? ` [${position}]` : "";
 };
 
+// Hilfsfunktion um herauszufinden, welche Knoten direkt nebeneinander liegen
+const findDirectNeighbor = (
+  node: Node,
+  allNodes: Node[],
+  direction: "left" | "right" | "above" | "below"
+): Node | null => {
+  for (const otherNode of allNodes) {
+    if (otherNode.id === node.id) continue;
+
+    switch (direction) {
+      case "right":
+        if (
+          otherNode.gridX === node.gridX + 2 &&
+          otherNode.gridY === node.gridY
+        ) {
+          return otherNode;
+        }
+        break;
+      case "left":
+        if (
+          otherNode.gridX === node.gridX - 2 &&
+          otherNode.gridY === node.gridY
+        ) {
+          return otherNode;
+        }
+        break;
+      case "below":
+        if (
+          otherNode.gridY === node.gridY + 2 &&
+          otherNode.gridX === node.gridX
+        ) {
+          return otherNode;
+        }
+        break;
+      case "above":
+        if (
+          otherNode.gridY === node.gridY - 2 &&
+          otherNode.gridX === node.gridX
+        ) {
+          return otherNode;
+        }
+        break;
+    }
+  }
+  return null;
+};
+
 export const generateTikzCode = (nodes: Node[], edges: Edge[]) => {
   let tikzCode = `\\begin{tikzpicture}[shorten >=1pt,node distance=2cm,on grid,auto]\n`;
 
-  nodes.forEach((node) => {
-    const relativePos = getRelativePosition(node, nodes);
+  // Sortiere Knoten nach ihrer numerischen ID (q0, q1, q2, ...)
+  const sortedNodes = [...nodes].sort((a, b) => {
+    const aNum = parseInt(a.id.substring(1));
+    const bNum = parseInt(b.id.substring(1));
+    return aNum - bNum;
+  });
+
+  // Erstelle eine optimierte Reihenfolge basierend auf Positionen
+  const optimizedOrder: Node[] = [];
+  const processedNodes = new Set<string>();
+
+  // Beginne mit dem ersten Knoten (q0)
+  if (sortedNodes.length > 0) {
+    optimizedOrder.push(sortedNodes[0]);
+    processedNodes.add(sortedNodes[0].id);
+  }
+
+  // Füge Knoten in einer Reihenfolge hinzu, die TikZ-Referenzen respektiert
+  while (optimizedOrder.length < sortedNodes.length) {
+    let addedInThisRound = false;
+
+    for (const node of sortedNodes) {
+      if (processedNodes.has(node.id)) continue;
+
+      // Prüfe, ob wir einen direkten Nachbarn haben, der bereits verarbeitet wurde
+      const hasProcessedNeighbor = ["left", "right", "above", "below"].some(
+        (direction) => {
+          const neighbor = findDirectNeighbor(
+            node,
+            sortedNodes,
+            direction as any
+          );
+          return neighbor && processedNodes.has(neighbor.id);
+        }
+      );
+
+      if (hasProcessedNeighbor) {
+        optimizedOrder.push(node);
+        processedNodes.add(node.id);
+        addedInThisRound = true;
+      }
+    }
+
+    // Fallback: Füge den nächsten Knoten hinzu, auch wenn er keinen direkten Nachbarn hat
+    if (!addedInThisRound) {
+      for (const node of sortedNodes) {
+        if (!processedNodes.has(node.id)) {
+          optimizedOrder.push(node);
+          processedNodes.add(node.id);
+          break;
+        }
+      }
+    }
+  }
+
+  // Reset für die finale Verarbeitung
+  processedNodes.clear();
+
+  optimizedOrder.forEach((node) => {
+    const relativePos = getRelativePosition(node, nodes, processedNodes);
     let nodeOptions = [];
 
     if (node.isStart) nodeOptions.push("initial");
@@ -74,8 +204,8 @@ export const generateTikzCode = (nodes: Node[], edges: Edge[]) => {
     const optionsStr =
       nodeOptions.length > 0 ? `[state,${nodeOptions.join(",")}]` : "[state]";
 
-    // Verwende das Label als TikZ-Knoten-ID und als Anzeige-Text
     tikzCode += `  \\node${optionsStr} (${node.label})${relativePos} {$${node.label}$};\n`;
+    processedNodes.add(node.id);
   });
 
   tikzCode += `\n`;
@@ -98,10 +228,8 @@ export const generateTikzCode = (nodes: Node[], edges: Edge[]) => {
         edgeOptions.push(`loop ${edge.style.loopPosition}`);
       } else {
         if (edge.style.bend !== "none") {
-          // Hole bendAmount (Standard: 30)
           const bendAmount = edge.style.bendAmount || 30;
 
-          // Nur bendAmount hinzufügen, wenn es nicht der Standardwert (30) ist
           if (bendAmount !== 30) {
             edgeOptions.push(`bend ${edge.style.bend}=${bendAmount}`);
           } else {
@@ -117,11 +245,9 @@ export const generateTikzCode = (nodes: Node[], edges: Edge[]) => {
         edgeOptions.length > 0 ? `[${edgeOptions.join(", ")}]` : "";
       const nodeStr = ` node{${edge.label}}`;
 
-      // Finde die entsprechenden Knoten-Labels basierend auf den IDs
       const fromNode = nodes.find((n) => n.id === edge.fromNodeId);
       const toNode = nodes.find((n) => n.id === edge.toNodeId);
 
-      // Verwende die Labels anstatt der IDs für die TikZ-Referenzen
       const fromLabel = fromNode?.label || edge.fromNodeId;
       const toLabel = toNode?.label || edge.toNodeId;
 

@@ -274,7 +274,7 @@ export default function AutomatonEditor() {
                       <polygon points="0 0, 10 3.5, 0 7" />
                     </marker>
                   </defs>
-                  {/* --- NEU: Grid wird nur bei Bedarf gerendert --- */}
+                  {/* --- Grid wird nur bei Bedarf gerendert --- */}
                   {showGrid && <Grid nodes={nodes} />}
                   {/* Wir mappen über die `edges`- und `nodes`-Arrays aus dem State... */}
                   {edges.map((edge) => (
