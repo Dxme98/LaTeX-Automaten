@@ -31,6 +31,7 @@ const NodeComponent: React.FC<NodeComponentProps> = ({
 
       {/* Node circle */}
       <circle
+        data-testid={`node-${node.id}`}
         cx={pos.x}
         cy={pos.y}
         r={NODE_RADIUS}
