@@ -58,29 +58,6 @@ const getRelativePosition = (
     position = `below=of ${closestNode.label}`;
   } else if (deltaY < 0 && deltaX === 0) {
     position = `above=of ${closestNode.label}`;
-  } else {
-    // Für diagonale Positionierung
-    let referenceForDiagonal = closestNode;
-
-    if (!processedNodes.has(closestNode.id)) {
-      for (const otherNode of allNodes) {
-        if (processedNodes.has(otherNode.id)) {
-          referenceForDiagonal = otherNode;
-          break;
-        }
-      }
-    }
-
-    if (deltaX > 0) position += `right=of ${referenceForDiagonal.label}`;
-    else if (deltaX < 0) position += `left=of ${referenceForDiagonal.label}`;
-
-    if (deltaY > 0) {
-      if (position) position += ", ";
-      position += `below=of ${referenceForDiagonal.label}`;
-    } else if (deltaY < 0) {
-      if (position) position += ", ";
-      position += `above=of ${referenceForDiagonal.label}`;
-    }
   }
 
   return position ? ` [${position}]` : "";
@@ -179,7 +156,7 @@ export const generateTikzCode = (nodes: Node[], edges: Edge[]) => {
       }
     }
 
-    // Fallback: Füge den nächsten Knoten hinzu, auch wenn er keinen direkten Nachbarn hat
+    // Fallback: Füge den nächsten Knoten hinzu, auch wenn er keinen direkten Nachbarn hat, kann bei Undo passieren
     if (!addedInThisRound) {
       for (const node of sortedNodes) {
         if (!processedNodes.has(node.id)) {
@@ -194,6 +171,7 @@ export const generateTikzCode = (nodes: Node[], edges: Edge[]) => {
   // Reset für die finale Verarbeitung
   processedNodes.clear();
 
+  // Detaillierte TikZ code erstellung mit relativen Postionen
   optimizedOrder.forEach((node) => {
     const relativePos = getRelativePosition(node, nodes, processedNodes);
     let nodeOptions = [];
@@ -210,51 +188,41 @@ export const generateTikzCode = (nodes: Node[], edges: Edge[]) => {
 
   tikzCode += `\n`;
 
-  const edgeGroups = edges.reduce((groups, edge) => {
-    const key = `${edge.fromNodeId}-${edge.toNodeId}`;
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(edge);
-    return groups;
-  }, {} as Record<string, Edge[]>);
-
   tikzCode += `  \\draw\n`;
   const edgeLines: string[] = [];
 
-  Object.values(edgeGroups).forEach((groupEdges) => {
-    groupEdges.forEach((edge) => {
-      let edgeOptions = [];
+  edges.forEach((edge) => {
+    let edgeOptions = [];
 
-      if (edge.style.isLoop) {
-        edgeOptions.push(`loop ${edge.style.loopPosition}`);
-      } else {
-        if (edge.style.bend !== "none") {
-          const bendAmount = edge.style.bendAmount || 30;
-
-          if (bendAmount !== 30) {
-            edgeOptions.push(`bend ${edge.style.bend}=${bendAmount}`);
-          } else {
-            edgeOptions.push(`bend ${edge.style.bend}`);
-          }
-        }
-        if (edge.style.labelPosition !== "above") {
-          edgeOptions.push(edge.style.labelPosition);
+    if (edge.style.isLoop) {
+      edgeOptions.push(`loop ${edge.style.loopPosition}`);
+    } else {
+      if (edge.style.bend !== "none") {
+        const bendAmount = edge.style.bendAmount || 30;
+        if (bendAmount !== 30) {
+          edgeOptions.push(`bend ${edge.style.bend}=${bendAmount}`);
+        } else {
+          edgeOptions.push(`bend ${edge.style.bend}`);
         }
       }
+      if (edge.style.labelPosition !== "above") {
+        edgeOptions.push(edge.style.labelPosition);
+      }
+    }
 
-      const optionsStr =
-        edgeOptions.length > 0 ? `[${edgeOptions.join(", ")}]` : "";
-      const nodeStr = ` node{${edge.label}}`;
+    const optionsStr =
+      edgeOptions.length > 0 ? `[${edgeOptions.join(", ")}]` : "";
+    const nodeStr = ` node{${edge.label}}`;
 
-      const fromNode = nodes.find((n) => n.id === edge.fromNodeId);
-      const toNode = nodes.find((n) => n.id === edge.toNodeId);
+    const fromNode = nodes.find((n) => n.id === edge.fromNodeId);
+    const toNode = nodes.find((n) => n.id === edge.toNodeId);
 
-      const fromLabel = fromNode?.label || edge.fromNodeId;
-      const toLabel = toNode?.label || edge.toNodeId;
+    const fromLabel = fromNode?.label || edge.fromNodeId;
+    const toLabel = toNode?.label || edge.toNodeId;
 
-      edgeLines.push(
-        `    (${fromLabel}) edge${optionsStr}${nodeStr} (${toLabel})`
-      );
-    });
+    edgeLines.push(
+      `    (${fromLabel}) edge${optionsStr}${nodeStr} (${toLabel})`
+    );
   });
 
   tikzCode += edgeLines.join("\n") + ";\n";
