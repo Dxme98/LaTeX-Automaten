@@ -111,7 +111,7 @@ const findDirectNeighbor = (
 };
 
 export const generateTikzCode = (nodes: Node[], edges: Edge[]) => {
-  let tikzCode = `\\begin{tikzpicture}[shorten >=1pt,node distance=2cm,on grid,auto]\n`;
+  let tikzCode = `\\begin{tikzpicture}[->, shorten >=1pt,node distance=2cm,on grid,auto]\n`;
 
   // Sortiere Knoten nach ihrer numerischen ID (q0, q1, q2, ...)
   const sortedNodes = [...nodes].sort((a, b) => {
