@@ -1,10 +1,20 @@
 import { Node, Edge } from "../types";
 
+/**
+ * Ermittelt die relative Position eines Knotens zu einem bereits verarbeiteten Nachbarknoten.
+ * Das Ergebnis ist ein für TikZ formatierter String, z.B. "[right=of q0]".
+ * Dies ermöglicht es TikZ, die Knoten automatisch anzuordnen, anstatt absolute Koordinaten zu verwenden.
+ * @param node Der Knoten, für den die relative Position bestimmt werden soll.
+ * @param allNodes Eine Liste aller Knoten im Graphen.
+ * @param processedNodes Ein Set von IDs der Knoten, die bereits im TikZ-Code deklariert wurden.
+ * @returns Ein String für die relative Positionierung in TikZ oder ein leerer String, wenn keine relative Positionierung möglich ist.
+ */
 const getRelativePosition = (
   node: Node,
   allNodes: Node[],
   processedNodes: Set<string>
 ) => {
+  // Sortiere alle Knoten numerisch, um einen stabilen Referenzknoten (q0) zu haben.
   const sortedNodes = [...allNodes].sort((a, b) => {
     const aNum = parseInt(a.id.substring(1));
     const bNum = parseInt(b.id.substring(1));
@@ -12,18 +22,22 @@ const getRelativePosition = (
   });
   const referenceNode = sortedNodes[0];
 
+  // Der erste Knoten (q0) benötigt keine relative Position.
   if (node.id === referenceNode.id) {
     return "";
   }
 
+  // Initialisiere die Suche mit dem Referenzknoten als bestem Kandidaten.
   let closestNode = referenceNode;
   let minDistance = Infinity;
 
-  // Finde den besten bereits verarbeiteten Knoten als Referenz
+  // Finde den nächstgelegenen, bereits verarbeiteten Knoten in derselben Zeile oder Spalte.
+  // Dies wird bevorzugt, um saubere `right=of` oder `below=of` Anweisungen zu erzeugen.
   for (const otherNode of allNodes) {
     if (otherNode.id === node.id) continue;
     if (!processedNodes.has(otherNode.id)) continue;
 
+    // Berechne die Distanz auf dem Grid.
     const distance =
       Math.abs(node.gridX - otherNode.gridX) +
       Math.abs(node.gridY - otherNode.gridY);
@@ -31,13 +45,15 @@ const getRelativePosition = (
     const sameRow = node.gridY === otherNode.gridY;
     const sameCol = node.gridX === otherNode.gridX;
 
+    // Wenn der Knoten in derselben Zeile/Spalte liegt und näher ist, merke ihn dir.
     if ((sameRow || sameCol) && distance < minDistance) {
       minDistance = distance;
       closestNode = otherNode;
     }
   }
 
-  // Fallback: Verwende den ersten Knoten, falls verfügbar
+  // Fallback: Wenn der "nächste" Knoten doch noch nicht verarbeitet wurde,
+  // aber der erste Knoten (q0) schon, verwende q0 als Referenz.
   if (
     !processedNodes.has(closestNode.id) &&
     processedNodes.has(referenceNode.id)
@@ -45,11 +61,12 @@ const getRelativePosition = (
     closestNode = referenceNode;
   }
 
+  // Berechne die Differenz der Grid-Koordinaten zum gefundenen Referenzknoten
   const deltaX = node.gridX - closestNode.gridX;
   const deltaY = node.gridY - closestNode.gridY;
 
+  // Erzeuge den TikZ-Positionierungsstring basierend auf der Richtung.
   let position = "";
-
   if (deltaX > 0 && deltaY === 0) {
     position = `right=of ${closestNode.label}`;
   } else if (deltaX < 0 && deltaY === 0) {
@@ -60,10 +77,18 @@ const getRelativePosition = (
     position = `above=of ${closestNode.label}`;
   }
 
+  // Gib den formatierten String zurück, falls eine Position gefunden wurde.
   return position ? ` [${position}]` : "";
 };
 
-// Hilfsfunktion um herauszufinden, welche Knoten direkt nebeneinander liegen
+/**
+ * Hilfsfunktion, um zu prüfen, ob ein direkter Nachbar in einer bestimmten Richtung existiert.
+ * Ein direkter Nachbar ist 2 Grid-Einheiten entfernt.
+ * @param node Der Ausgangsknoten.
+ * @param allNodes Liste aller Knoten.
+ * @param direction Die zu prüfende Richtung.
+ * @returns Den Nachbarknoten, falls gefunden, ansonsten `null`.
+ */
 const findDirectNeighbor = (
   node: Node,
   allNodes: Node[],
@@ -110,7 +135,14 @@ const findDirectNeighbor = (
   return null;
 };
 
+/**
+ * Generiert den vollständigen TikZ-Code für den aktuellen Automaten.
+ * @param nodes Die Liste der Knoten.
+ * @param edges Die Liste der Kanten.
+ * @returns Ein String, der den TikZ-Code enthält.
+ */
 export const generateTikzCode = (nodes: Node[], edges: Edge[]) => {
+  // Initialisiert den TikZ-Code mit den Standardoptionen für Automaten.
   let tikzCode = `\\begin{tikzpicture}[->, shorten >=1pt,node distance=2cm,on grid,auto]\n`;
 
   // Sortiere Knoten nach ihrer numerischen ID (q0, q1, q2, ...)
@@ -120,7 +152,9 @@ export const generateTikzCode = (nodes: Node[], edges: Edge[]) => {
     return aNum - bNum;
   });
 
-  // Erstelle eine optimierte Reihenfolge basierend auf Positionen
+  // OPTIMIERUNG: Bestimme die beste Reihenfolge für die Knotendeklaration in TikZ.
+  // Ziel ist, dass ein Knoten immer relativ zu einem bereits deklarierten Knoten positioniert wird.
+  // Das verhindert "node not defined" Fehler in LaTeX.
   const optimizedOrder: Node[] = [];
   const processedNodes = new Set<string>();
 
@@ -145,10 +179,12 @@ export const generateTikzCode = (nodes: Node[], edges: Edge[]) => {
             sortedNodes,
             direction as any
           );
+          // Ein Nachbar ist nur gültig, wenn er existiert UND bereits verarbeitet wurde.
           return neighbor && processedNodes.has(neighbor.id);
         }
       );
 
+      // Wenn ein verarbeiteter Nachbar existiert, ist dieser Knoten ein guter nächster Kandidat.
       if (hasProcessedNeighbor) {
         optimizedOrder.push(node);
         processedNodes.add(node.id);
@@ -156,7 +192,9 @@ export const generateTikzCode = (nodes: Node[], edges: Edge[]) => {
       }
     }
 
-    // Fallback: Füge den nächsten Knoten hinzu, auch wenn er keinen direkten Nachbarn hat, kann bei Undo passieren
+    // Fallback: Wenn in einer Runde kein Knoten mit einem verarbeiteten Nachbarn gefunden wurde
+    // (kann bei "losgelösten" Graphenteilen oder nach Undo-Operationen passieren),
+    // füge einfach den nächsten unverarbeiteten Knoten aus der sortierten Liste hinzu.
     if (!addedInThisRound) {
       for (const node of sortedNodes) {
         if (!processedNodes.has(node.id)) {
@@ -171,7 +209,7 @@ export const generateTikzCode = (nodes: Node[], edges: Edge[]) => {
   // Reset für die finale Verarbeitung
   processedNodes.clear();
 
-  // Detaillierte TikZ code erstellung mit relativen Postionen
+  // Iteriere durch die OPTIMIERTE Reihenfolge, um die \node-Befehle zu erstellen.
   optimizedOrder.forEach((node) => {
     const relativePos = getRelativePosition(node, nodes, processedNodes);
     let nodeOptions = [];
@@ -182,12 +220,14 @@ export const generateTikzCode = (nodes: Node[], edges: Edge[]) => {
     const optionsStr =
       nodeOptions.length > 0 ? `[state,${nodeOptions.join(",")}]` : "[state]";
 
+    // Füge den \node Befehl zum TikZ-Code hinzu.
     tikzCode += `  \\node${optionsStr} (${node.label})${relativePos} {$${node.label}$};\n`;
     processedNodes.add(node.id);
   });
 
   tikzCode += `\n`;
 
+  // --- Generierung des Edge-Codes ---
   tikzCode += `  \\draw\n`;
   const edgeLines: string[] = [];
 
